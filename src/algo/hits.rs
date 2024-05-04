@@ -31,7 +31,7 @@ impl Sqrt for f64 {
 
 fn compute_normalized_score<N, H>(
     network: N,
-    score1: &mut Vec<H>,
+    score1: &mut [H],
     score2: &[H],
     dir: Direction,
     norm: HitsNorm,
@@ -157,10 +157,10 @@ where
     for _ in 0..nb_iter {
         // Compute the normalized scores.
         let norm_sum_in_hubs =
-            compute_normalized_score(&network, &mut auth, &hub, Direction::Incoming, norm);
+            compute_normalized_score(network, &mut auth, &hub, Direction::Incoming, norm);
 
         let norm_sum_out_auths =
-            compute_normalized_score(&network, &mut hub, &auth, Direction::Outgoing, norm);
+            compute_normalized_score(network, &mut hub, &auth, Direction::Outgoing, norm);
 
         // Update the scores.
         let new_auth = normalize(&auth, norm_sum_in_hubs);
