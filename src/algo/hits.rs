@@ -2,6 +2,9 @@ use crate::visit::{IntoNeighborsDirected, NodeCount, NodeIndexable};
 
 use super::{Direction, UnitMeasure};
 
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
+
 /// Norm used for score normalization.
 #[derive(Clone, Copy)]
 pub enum HitsNorm {
@@ -141,7 +144,7 @@ where
 pub fn hits<N, H>(network: N, tol: Option<H>, nb_iter: usize, norm: HitsNorm) -> (Vec<H>, Vec<H>)
 where
     N: NodeCount + IntoNeighborsDirected + NodeIndexable,
-    H: UnitMeasure + std::iter::Sum<H> + Copy + Sqrt,
+    H: UnitMeasure + Copy + Sqrt,
 {
     let node_count = network.node_count();
     if node_count == 0 {
@@ -166,7 +169,89 @@ where
         let new_auth = normalize(&auth, norm_sum_in_hubs);
         let new_hub = normalize(&hub, norm_sum_out_auths);
         if max(delta(&auth, &new_auth), delta(&hub, &new_hub)) <= tolerance {
-            return (auth, hub);
+            return (new_auth, new_hub);
+        } else {
+            auth = new_auth;
+            hub = new_hub;
+        }
+    }
+    (auth, hub)
+}
+
+#[cfg(feature = "rayon")]
+fn par_compute_normalized_score<N, H>(
+    network: N,
+    score1: &mut [H],
+    score2: &[H],
+    dir: Direction,
+    norm: HitsNorm,
+) -> H
+where
+    N: NodeCount + IntoNeighborsDirected + NodeIndexable + std::marker::Sync,
+    H: UnitMeasure + Sqrt + Copy + std::marker::Send + std::marker::Sync,
+{
+    score1.par_iter_mut().enumerate().for_each(|(page, score)| {
+        *score = network
+            .neighbors_directed(network.from_index(page), dir)
+            .map(|ix| score2[network.to_index(ix)])
+            .sum::<H>();
+    });
+    match norm {
+        HitsNorm::One => score1.par_iter().map(|score| *score).sum::<H>(),
+        HitsNorm::Two => score1
+            .par_iter()
+            .map(|score| *score * *score)
+            .sum::<H>()
+            .sqrt(),
+    }
+}
+
+#[cfg(feature = "rayon")]
+fn par_normalize<H>(score: &[H], norm: H) -> Vec<H>
+where
+    H: UnitMeasure + Copy + std::marker::Send + std::marker::Sync,
+{
+    score.par_iter().map(|s| *s / norm).collect::<Vec<H>>()
+}
+
+/// Parallel Hyperlink-Induced Topic Search algorithm.
+///
+/// See [`hits`].
+#[cfg(feature = "rayon")]
+pub fn parallel_hits<N, H>(
+    network: N,
+    tol: Option<H>,
+    nb_iter: usize,
+    norm: HitsNorm,
+) -> (Vec<H>, Vec<H>)
+where
+    N: NodeCount + IntoNeighborsDirected + NodeIndexable + std::marker::Sync,
+    H: UnitMeasure + Copy + Sqrt + std::marker::Send + std::marker::Sync,
+{
+    let node_count = network.node_count();
+    if node_count == 0 {
+        return (vec![], vec![]);
+    }
+    let mut tolerance = H::default_tol();
+    if let Some(_tol) = tol {
+        tolerance = _tol;
+    }
+    let mut auth: Vec<H> = (0..node_count).into_par_iter().map(|_i| H::one()).collect();
+    let mut hub: Vec<H> = (0..node_count).into_par_iter().map(|_i| H::one()).collect();
+
+    for _ in 0..nb_iter {
+        // Compute the normalized scores.
+        let norm_sum_in_hubs =
+            par_compute_normalized_score(network, &mut auth, &hub, Direction::Incoming, norm);
+
+        let norm_sum_out_auths =
+            par_compute_normalized_score(network, &mut hub, &auth, Direction::Outgoing, norm);
+
+        // Update the scores.
+        let new_auth = par_normalize(&auth, norm_sum_in_hubs);
+        let new_hub = par_normalize(&hub, norm_sum_out_auths);
+        if max(delta(&auth, &new_auth), delta(&hub, &new_hub)) <= tolerance {
+            return (new_auth, new_hub);
         } else {
             auth = new_auth;
             hub = new_hub;
