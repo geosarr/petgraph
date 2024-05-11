@@ -15,6 +15,7 @@ pub mod isomorphism;
 pub mod k_shortest_path;
 pub mod matching;
 pub mod min_spanning_tree;
+pub mod node_classification;
 pub mod page_rank;
 pub mod simple_paths;
 pub mod tred;
@@ -45,6 +46,7 @@ pub use isomorphism::{
 pub use k_shortest_path::k_shortest_path;
 pub use matching::{greedy_matching, maximum_matching, Matching};
 pub use min_spanning_tree::min_spanning_tree;
+pub use node_classification::label_propagation;
 pub use page_rank::page_rank;
 pub use simple_paths::all_simple_paths;
 
