@@ -1,9 +1,9 @@
 use crate::data::DataMap;
-use crate::graph::IndexType;
 use crate::matrix_graph::Nullable;
 use crate::visit::{IntoNeighbors, IntoNodeReferences, NodeCount, NodeRef};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::hash::Hash;
 
 pub fn label_propagation<G>(
     graph: G,
@@ -12,8 +12,8 @@ pub fn label_propagation<G>(
 ) -> HashMap<G::NodeId, G::NodeWeight>
 where
     G: IntoNodeReferences + NodeCount + IntoNeighbors + DataMap,
-    G::NodeId: IndexType,
-    G::NodeWeight: PartialEq + Clone + Debug + Nullable,
+    G::NodeId: Hash + Eq,
+    G::NodeWeight: PartialEq + Clone + Nullable,
 {
     let mut predicted_labels = HashMap::new();
     if graph.node_count() == 0 || labels.is_empty() {

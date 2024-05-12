@@ -2,7 +2,7 @@ use petgraph::algo::label_propagation;
 use petgraph::prelude::{Graph, NodeIndex};
 
 #[test]
-fn test_code() {
+fn test_label_propagation() {
     let mut graph = Graph::<Option<&str>, ()>::new();
     graph.add_node(Some("A"));
     graph.add_node(None); // missing label
