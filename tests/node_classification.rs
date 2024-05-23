@@ -18,6 +18,6 @@ fn test_label_propagation() {
             (NodeIndex::new(1), Some("B")),
             (NodeIndex::new(6), Some("C"))
         ]),
-        label_propagation(&graph, &labels, 10)
+        label_propagation(&graph, &labels, 1, 10)
     );
 }
